@@ -21,7 +21,7 @@ fi
 
 cd "$WT"
 "$CODEX" exec \
-  --full-auto \
+  --sandbox workspace-write \
   --output-last-message "$ROOT/logs/$ID.last" \
-  "Read AGENTS.md and PLAN.md, then carry out the task in briefs/$ID.md. You are on branch codex/$ID; commit your work there." \
+  "Read AGENTS.md and PLAN.md, then carry out the task in briefs/$ID.md. You are on branch codex/$ID; commit your work there if git allows it; if not, leave changes uncommitted and say so." \
   2>&1 | tee "$ROOT/logs/$ID.log"
