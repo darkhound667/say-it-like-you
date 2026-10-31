@@ -6,3 +6,4 @@ Each task has an owner (`claude` / `codex`), a branch, and a brief in `briefs/<i
 | ID | Task | Owner | Branch | Status | Notes |
 |----|------|-------|--------|--------|-------|
 | T0 | Scaffold repo | claude | main | todo | |
+| T1 | Taskboard CLI (tools/taskboard) | codex | codex/T1-taskboard | done | Reviewed by claude, 11 tests pass |
