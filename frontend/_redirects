@@ -1,0 +1,2 @@
+# Forward API calls to the Flask backend. Replace BACKEND_URL with its public host (no scheme).
+/api/*  https://BACKEND_URL/api/:splat  200!
