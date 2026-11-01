@@ -1,32 +1,17 @@
-# Hackathon Plan
+# Hackathon Plan — "Say it like you"
 
-> Owner: Claude (manager). Executor: Codex. Update this file first whenever scope changes.
+> Owner: Claude (manager). Executors: Codex (server), agy (UI), Hyde (tests/docs).
 
-## Problem statement
-_TBD — paste the official statement here._
+## Problem (Sarvam AI, IIT Bombay)
+Clone a learner's voice, then generate correct pronunciation of new vocabulary/phrases in their own voice, across Indian languages.
 
-## Judging criteria / constraints
-_TBD — criteria, time limit, required tech/APIs, demo format._
-
-## Goal (one sentence)
-_TBD_
-
-## MVP scope (must work in the demo)
-- _TBD_
-
-## Stretch (only if MVP is green)
-- _TBD_
+## Product
+Website, no install/login. Visitor records ~10 s -> Sarvam voice clone -> types/translates a phrase -> hears it in THEIR voice in the target language. API contract: `API_CONTRACT.md` (confirmed SDK facts, 12 clone languages).
 
 ## Architecture
-_TBD — stack, folders, data flow. Keep it boring and fast to build._
-
-## Timeline
-| Time | Milestone |
-|------|-----------|
-| T+0h | Plan + scaffold |
-| T+? | MVP end-to-end |
-| T-2h | Feature freeze |
-| T-1h | Demo script + README + deploy |
+`server.py` (Flask, holds key, sessions token->voice_id, limits, janitor) + `frontend/index.html` (single file, works from file:// and served at /).
 
 ## Decisions log
-- _date/time — decision — why_
+- Voice-clone languages are 12 (docs), not 13 as the brief said.
+- Sarvam clone endpoint is 10 req/min on Starter -> server-side throttle + caching.
+- No cloudflared/ngrok installed locally -> ask user for deploy choice at Phase 1.5.
