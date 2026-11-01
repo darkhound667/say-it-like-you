@@ -289,7 +289,11 @@ def ffmpeg(source, output, rate, trim=False):
         raise Problem("ffmpeg_missing", "Audio conversion is unavailable: ffmpeg is not installed.", 500)
     command = [executable, "-nostdin", "-v", "error", "-y", "-i", str(source)]
     if trim:
-        command += ["-t", "15"]
+        # Clone reference: drop low rumble, strip leading/trailing silence and room-noise tails,
+        # level the voice, then keep at most 15 s of actual speech.
+        trim_silence = "silenceremove=start_periods=1:start_duration=0.1:start_threshold=-45dB"
+        command += ["-af", f"highpass=f=70,{trim_silence},areverse,{trim_silence},areverse,"
+                           "loudnorm=I=-18:TP=-2:LRA=11", "-t", "15"]
     command += ["-vn", "-ac", "1", "-ar", str(rate), "-sample_fmt", "s16", "-c:a", "pcm_s16le", str(output)]
     try:
         subprocess.run(command, capture_output=True, check=True, timeout=20)
