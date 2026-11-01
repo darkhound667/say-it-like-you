@@ -23,16 +23,21 @@ Claude keeps the context; Codex gets a short self-contained brief instead of re-
    `PYTHONPATH=tools python3 -m taskboard set <id> --status done`.
 6. **Save Claude tokens:** don't paste large files into chat, don't re-read files you just wrote,
    keep replies short, keep `PLAN.md` the single source of context (update it when scope changes).
-7. **Two executors, two separate limit pools — use both.**
+7. **Three executors, three separate limit pools — use all of them.**
    - Codex (`scripts/codex-task.sh <id> <tier>`): primary. Backend, logic, algorithms, debugging.
    - Antigravity `agy` (`scripts/agy-task.sh <id> <tier>`): second pool. Frontend/UI, docs, tests,
      boilerplate, and overflow when running tasks in parallel. Same brief format, same worktree flow
      (branch `agy/<id>`; merge with `scripts/agy-task.sh merge <id>`).
      agy tiers: light = gemini-3.8-flash-low, standard = gemini-3.8-flash-high,
      heavy = claude-sonnet-4-6. Never opus, never `--dangerously-skip-permissions`.
-   - When splitting a big job into parallel briefs, spread them across both tools.
-   - If one tool hits its limit (quota/rate-limit error in its output), reroute to the other.
-     Only when BOTH are exhausted, tell the user before doing the coding yourself.
+   - Hyde AI via OpenCode (`scripts/hyde-task.sh <id> <tier>`): third pool. Same brief/worktree flow
+     (branch `hyde/<id>`; merge with `scripts/hyde-task.sh merge <id>`). Tiers: light =
+     hyde/glm-5.3-flash, standard = hyde/kimi-k3, heavy = kimi-k3 `--variant high`. Uses the
+     `~/.hyde-opencode` profile and `$HYDE_INFERENCE_API_KEY` from the shell env. Never `--auto`.
+     Good for boilerplate/tests/docs and overflow. Only the light tier has been tested so far.
+   - When splitting a big job into parallel briefs, spread them across all three tools.
+   - If one tool hits its limit (quota/rate-limit error in its output), reroute to another.
+     Only when ALL are exhausted, tell the user before doing the coding yourself.
    - agy headless mode auto-denies any shell command not in the runner's allow-list; if a report
      says "auto-denied", add a `command(<prefix>)` rule to `ALLOW` in `scripts/agy-task.sh`.
 8. No pushing, deploying or sending anything outside this machine without the user's go-ahead.
