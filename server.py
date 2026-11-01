@@ -395,12 +395,15 @@ WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
 def strip_markdown(text):
-    text = re.sub(r"^\s*```.*$", "", text, flags=re.M)
-    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)
-    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
-    text = re.sub(r"^\s{0,3}#{1,6}\s*", "", text, flags=re.M)
-    text = re.sub(r"^\s*>+\s?", "", text, flags=re.M)
-    text = re.sub(r"^\s*(?:[-*+]|\d+[.)])\s+", "", text, flags=re.M)
+    # Bound the input and keep leading-whitespace patterns on one line ([ \t]) so crafted
+    # uploads cannot trigger quadratic regex backtracking.
+    text = text[:20000]
+    text = re.sub(r"^[ \t]*```.*$", "", text, flags=re.M)
+    text = re.sub(r"!\[[^\]\n]{0,200}\]\([^)\n]{0,500}\)", "", text)
+    text = re.sub(r"\[([^\]\n]{0,200})\]\([^)\n]{0,500}\)", r"\1", text)
+    text = re.sub(r"^[ \t]{0,3}#{1,6}[ \t]*", "", text, flags=re.M)
+    text = re.sub(r"^[ \t]*>+[ \t]?", "", text, flags=re.M)
+    text = re.sub(r"^[ \t]*(?:[-*+]|\d+[.)])[ \t]+", "", text, flags=re.M)
     text = re.sub(r"(\*\*|__)(.+?)\1", r"\2", text)
     text = re.sub(r"(?<![\w*])\*([^*\n]+)\*(?![\w*])", r"\1", text)
     return re.sub(r"`([^`]*)`", r"\1", text)
@@ -409,10 +412,14 @@ def strip_markdown(text):
 def docx_text(data):
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            if archive.getinfo("word/document.xml").file_size > 2_000_000:
+                raise ValueError("too large")
             with archive.open("word/document.xml") as member:
-                xml = member.read(5_000_001)
-        if len(xml) > 5_000_000:
+                xml = member.read(2_000_001)
+        if len(xml) > 2_000_000:
             raise ValueError("too large")
+        if b"\x00" in xml or xml[:2] in (b"\xff\xfe", b"\xfe\xff"):
+            raise ValueError("unsupported encoding")
         if b"<!DOCTYPE" in xml.upper() or b"<!ENTITY" in xml.upper():
             raise ValueError("unsafe xml")
         root = ET.fromstring(xml)
@@ -431,9 +438,9 @@ def extract():
     extension = os.path.splitext(filename)[1].lower()
     if extension not in (".txt", ".md", ".markdown", ".docx"):
         raise Problem("unsupported_file", "Upload a .txt, .md or .docx file.", 400)
-    data = upload.read(1_000_001)
-    if len(data) > 1_000_000:
-        raise Problem("payload_too_large", "That file is too large. Keep it under 1 MB.", 413)
+    data = upload.read(500_001)
+    if len(data) > 500_000:
+        raise Problem("payload_too_large", "That file is too large. Keep it under 500 KB.", 413)
     if extension == ".docx":
         text = docx_text(data)
     else:
@@ -469,8 +476,8 @@ def speak():
     cache_key = hashlib.sha256(repr((g.token, text, lang, pace, qc)).encode()).hexdigest()
     if cache_key in g.session["cache"]:
         return jsonify(**g.session["cache"][cache_key], cached=True)
-    synth_slot()
     charge(synth=True)
+    synth_slot()
     response = sarvam_call(client.voice_cloning.convert, synth=True, voice_id=g.session["voice_id"],
                           text=text, language_code=lang, pace=pace, enable_qc=qc,
                           output_audio_codec="wav", speech_sample_rate=24000)

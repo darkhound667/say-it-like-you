@@ -1,0 +1,38 @@
+{
+  "hi_1.wav": {
+    "language": "hi-IN",
+    "english": "Hello, I'm so happy to meet you.",
+    "translated": "नमस्ते, मैं आपसे मिलकर बहुत खुश हूँ।",
+    "romanized": "Namaste, main aapse milkar bahut khush hun."
+  },
+  "hi_2.wav": {
+    "language": "hi-IN",
+    "english": "Where is the railway station?",
+    "translated": "रेलवे स्टेशन कहाँ है?",
+    "romanized": "Railway station kahan hai?"
+  },
+  "ta_1.wav": {
+    "language": "ta-IN",
+    "english": "Hello, I'm so happy to meet you.",
+    "translated": "வணக்கம், உங்களை சந்தித்ததில் எனக்கு மிகவும் மகிழ்ச்சி.",
+    "romanized": "Vandanam, aapnannu mulugidathil enakku atyanta aanandham."
+  },
+  "ta_2.wav": {
+    "language": "ta-IN",
+    "english": "Where is the railway station?",
+    "translated": "ரயில் நிலையம் எங்கே இருக்கிறது?",
+    "romanized": "Rail station engee irukku?"
+  },
+  "bn_1.wav": {
+    "language": "bn-IN",
+    "english": "Hello, I'm so happy to meet you.",
+    "translated": "হ্যালো, তোমার সাথে দেখা করে আমি খুব খুশি।",
+    "romanized": "Hello, tar sathe dekha kore ami khub khushi."
+  },
+  "bn_2.wav": {
+    "language": "bn-IN",
+    "english": "Where is the railway station?",
+    "translated": "রেলওয়ে স্টেশনটি কোথায়?",
+    "romanized": "Railway station sthan?"
+  }
+}
