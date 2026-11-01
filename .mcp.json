@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "sarvam": {
+      "command": "uvx",
+      "args": ["sarvam-mcp"],
+      "env": {
+        "SARVAM_MCP_BASE_PATH": "/Users/ruturva/Desktop/hackathon/sarvam-out"
+      }
+    },
+    "sarvam-docs": {
+      "type": "http",
+      "url": "https://docs.sarvam.ai/_mcp/server"
+    }
+  }
+}

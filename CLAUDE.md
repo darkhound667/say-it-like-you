@@ -37,6 +37,16 @@ Claude keeps the context; Codex gets a short self-contained brief instead of re-
      says "auto-denied", add a `command(<prefix>)` rule to `ALLOW` in `scripts/agy-task.sh`.
 8. No pushing, deploying or sending anything outside this machine without the user's go-ahead.
 
+## Sarvam AI (Indian-language speech/text/vision) — MCP in `.mcp.json`
+- Servers: `sarvam` (official `uvx sarvam-mcp`: STT, TTS, translate, transliterate, LLM, document
+  vision, dubbing; key read from `~/.sarvam/credentials`, never in the repo) and `sarvam-docs` (`searchDocs`).
+- Use it when the problem involves Indic languages, voice, or document OCR. Call `sarvam_code_*` tools
+  (pricing, snippets, validate_request) BEFORE briefing Codex/agy on Sarvam code, and paste the verified
+  snippet into the brief so executors don't guess the API.
+- Sarvam calls spend the user's Sarvam credits: check `sarvam_code_pricing`, keep test inputs tiny,
+  and never loop API calls. Generated audio/files land in `sarvam-out/` (gitignored).
+- Executors (Codex/agy) call the Sarvam REST API from app code via `SARVAM_API_KEY` env var only.
+
 ## Files
 - `PLAN.md` project context · `TASKS.md` board (CLI: `tools/taskboard`) · `AGENTS.md` Codex's rules
 - `briefs/` task briefs · `logs/<id>.log` full Codex transcript, `logs/<id>.last` final report

@@ -4,4 +4,5 @@ __pycache__/
 *.pyc
 .venv/
 logs/
+sarvam-out/
 .DS_Store
