@@ -60,7 +60,7 @@ async function finishRecording(r){if(state.recording!==r)return;state.recording=
 function extension(blob){return blob.type.includes('mp4')?'mp4':blob.type.includes('wav')?'wav':'webm';}
 async function enroll(){if(!state.enrollment||!$('consent').checked)return;setBusy(true);$('record-form').hidden=true;$('cloning').hidden=false;const lines=['Listening closely…','Learning your vowels…',"Borrowing your voice (we'll give it back)…"];let i=0;const timer=setInterval(()=>$('clone-status').textContent=lines[++i%lines.length],1000);const form=new FormData();form.append('audio',state.enrollment,'voice.'+extension(state.enrollment));form.append('language',state.recordedLanguage);form.append('consent','true');try{await Promise.all([request('/api/voice/enroll',{method:'POST',body:form}),sleep(3000)]);setStep(3);toast('Your voice is ready. Try a phrase in Tamil.');}catch(error){toast(error.message);}finally{clearInterval(timer);$('record-form').hidden=false;$('cloning').hidden=true;setBusy(false);}}
 async function translate(){const text=$('phrase').value.trim();if(!text)return toast('Type or pick a phrase first.');setBusy(true);$('translate').textContent='Translating…';try{const result=await jsonRequest('/api/translate',{text,source_lang:'auto',target_lang:state.language});$('phrase').value=result.translated;updateCount();$('romanized').textContent=result.romanized||'';$('romanized').hidden=!result.romanized;}catch(error){toast(error.message);}finally{setBusy(false);$('translate').textContent='Translate to '+languageName();}}
-async function synth(text,language,pace){const key=JSON.stringify([text,language,pace]);if(state.cache.has(key))return state.cache.get(key);const data=await jsonRequest('/api/speak',{text,target_lang:language,pace});const clip={text,language,pace,url:'data:'+(data.mime||'audio/wav')+';base64,'+data.audio_b64,romanized:data.romanized};state.cache.set(key,clip);return clip;}
+async function synth(text,language,pace){const qc=!!document.getElementById('qc')?.checked;const key=JSON.stringify([text,language,pace,qc]);if(state.cache.has(key))return state.cache.get(key);const data=await jsonRequest('/api/speak',qc?{text,target_lang:language,pace,qc:true}:{text,target_lang:language,pace});const clip={text,language,pace,url:'data:'+(data.mime||'audio/wav')+';base64,'+data.audio_b64,romanized:data.romanized};state.cache.set(key,clip);return clip;}
 function confetti(){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;for(let i=0;i<20;i++){const bit=document.createElement('i');bit.className='confetti';bit.style.setProperty('--x',(Math.random()-.5)*450+'px');bit.style.setProperty('--y',(Math.random()-.7)*330+'px');bit.style.background=i%2?'var(--teal)':'var(--accent)';document.body.append(bit);setTimeout(()=>bit.remove(),850);}}
 function showReveal(clip){if(!state.firstPlay)return;state.firstPlay=false;$('reveal-title').textContent="That's you. In "+languageName(clip.language)+'.';$('player').classList.remove('reveal');void $('player').offsetWidth;$('player').classList.add('reveal');confetti();announce($('reveal-title').textContent);}
 async function playClip(clip,highlight=null){const audio=$('audio');audio.pause();audio.src=clip.url;audio.onplaying=()=>{showReveal(clip);$('play').textContent='↻ Replay my voice';};try{await audio.play();}catch{toast('Your clip is ready. Tap Play my voice to listen.');$('play').textContent='▶ Play my voice';return false;}if(highlight)highlight.classList.add('speaking');return true;}
@@ -160,6 +160,39 @@ $('copy-command').onclick=async()=>{try{await navigator.clipboard.writeText('pyt
 $('server-name').textContent=state.mock?'Offline demo':API_BASE||location.origin;
 if(state.mock){$('mode-badge').textContent='Offline demo · simulated voice';$('record-hint').textContent='Demo recording · stop after 8 seconds. Output is a test tone.';}
 window.addEventListener('pagehide',()=>{chorus.cancel?.();$('chorus-audio').pause();if(state.recording)stopRecording(true);if(state.attemptUrl)URL.revokeObjectURL(state.attemptUrl);state.audioContext?.close();});
+/* addon: name, A/B, expiry, grandma, qc, demo */
+(()=>{
+const css=document.createElement('style');css.textContent='body.demo{font-size:20px}body.demo button,body.demo input,body.demo select,body.demo textarea{font-size:1.15em;min-height:56px}#expiry{font-size:.85rem}.ab-row{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}.ab-row button{flex:1}';document.head.append(css);
+const p=$('phrase');
+// 1 Say my name
+p.insertAdjacentHTML('beforebegin','<div class="row" style="margin-bottom:8px"><input id="name-in" maxlength="40" placeholder="Your name" aria-label="Your name" style="flex:1;min-width:0"><button id="name-go" type="button">Say my name</button></div>');
+$('name-go').onclick=()=>{const n=$('name-in').value.trim();if(!n)return toast('Type your name first.');p.value=('My name is '+n+'.').slice(0,200);updateCount();translate();};
+// 2 A/B
+let origUrl=null;
+document.addEventListener('click',e=>{if(e.target.closest('#enroll')&&state.enrollment){if(origUrl)URL.revokeObjectURL(origUrl);origUrl=URL.createObjectURL(state.enrollment);}},true);
+$('player').insertAdjacentHTML('beforeend','<div class="ab-row" id="ab" hidden><button type="button" id="ab-real">My real voice</button><button type="button" id="ab-clone">My voice in …</button></div>');
+$('ab-real').onclick=()=>{if(!origUrl)return toast('Original recording not available.');$('audio').src=origUrl;$('audio').play().catch(()=>{});};
+$('ab-clone').onclick=()=>{if(state.current){$('audio').src=state.current.url;$('audio').play().catch(()=>{});}};
+const sc=selectClip;selectClip=function(c){sc(c);$('ab').hidden=!origUrl;$('ab-clone').textContent='My voice in '+languageName(c.language);};
+const rc=resetConsent;resetConsent=function(){rc();if(origUrl)URL.revokeObjectURL(origUrl);origUrl=null;$('ab').hidden=true;expiry=0;};
+// 3 expiry
+let expiry=0;
+document.querySelector('footer').insertAdjacentHTML('afterbegin','<span id="expiry" class="small muted" aria-live="off"></span>');
+$('step-3').insertAdjacentHTML('beforeend','<p class="small muted" style="margin-top:10px">Your clone is held by Sarvam for up to 2 hours, then deleted; tap Delete my voice to remove it now.</p>');
+const rq=request;request=async function(path,o,r){const res=await rq(path,o,r);if(res&&res.expires_at)expiry=Number(res.expires_at);else if(state.mock&&/enroll/.test(path))expiry=Date.now()/1000+7200;return res;};
+setInterval(()=>{const el=$('expiry');if(!expiry||state.step!==3){el.textContent=expiry?'':'';if(state.step!==3&&expiry)el.textContent='';return;}const left=Math.floor(expiry-Date.now()/1000);if(left<=0){expiry=0;el.textContent='';resetConsent();toast('Your voice clone has expired and been removed. Record again whenever you like.');return;}const h=Math.floor(left/3600),m=String(Math.floor(left%3600/60)).padStart(h?2:1,'0'),s=String(left%60).padStart(2,'0');el.textContent='Your voice clone expires in '+(h?h+':':'0:')+m.padStart(2,'0')+':'+s+' · ';},1000);
+// 4 grandma
+const rel=[['Ajji','Kannada','kn-IN'],['Paati','Tamil','ta-IN'],['Nani','Hindi','hi-IN'],['Dadi','Hindi','hi-IN'],['Ammamma','Telugu','te-IN'],['Thatha','Tamil','ta-IN'],['Aaji','Marathi','mr-IN'],['Dida','Bengali','bn-IN']];
+$('step-3').insertAdjacentHTML('afterend','<section class="card" id="grandma" hidden><div class="eyebrow">Grandma Mode</div><h2>Say it to someone you love.</h2><label class="field-label" for="g-rel">Who is it for?</label><select id="g-rel">'+rel.map((r,i)=>'<option value="'+i+'">'+r[0]+' — '+r[1]+'</option>').join('')+'</select><label class="field-label" for="g-text">In English</label><textarea id="g-text" maxlength="200" placeholder="I miss you."></textarea><div class="chips presets" id="g-presets">'+['I miss you.',"I'm learning your language for you.",'Have you eaten?'].map(t=>'<button type="button">'+t+'</button>').join('')+'</div><button id="g-go" class="primary wide" style="margin-top:12px" type="button">Translate and say it in my voice</button><p id="g-native" style="font-size:1.4em;margin:12px 0 0"></p><p id="g-roman" class="small muted"></p></section>');
+$('g-presets').onclick=e=>{if(e.target.tagName==='BUTTON')$('g-text').value=e.target.textContent;};
+$('g-go').onclick=async()=>{const t=$('g-text').value.trim();if(!t)return toast('Type or pick a sentence first.');const code=rel[$('g-rel').value][2];setBusy(true);$('g-go').textContent='Finding your voice…';try{const tr=await jsonRequest('/api/translate',{text:t,source_lang:'en-IN',target_lang:code});$('g-native').textContent=tr.translated;$('g-roman').textContent=tr.romanized||'';const clip=await synth(tr.translated,code,1);if(clip.romanized&&!tr.romanized)$('g-roman').textContent=clip.romanized;const a=new Audio(clip.url);await a.play().catch(()=>toast('Your clip is ready but autoplay was blocked.'));}catch(e){toast(e.message);}finally{setBusy(false);$('g-go').textContent='Translate and say it in my voice';}};
+const ss=setStep;setStep=function(n){ss(n);$('grandma').hidden=n!==3;};$('grandma').hidden=state.step!==3;
+// 5 qc
+$('speak').insertAdjacentHTML('beforebegin','<label class="small row" style="margin-top:14px"><input type="checkbox" id="qc">High-quality take (slower)</label>');
+// 6 demo
+$('step-3').insertAdjacentHTML('afterbegin','<label class="small row" style="margin-bottom:10px"><input type="checkbox" id="demo-mode">Demo mode (big buttons)</label>');
+$('demo-mode').onchange=e=>document.body.classList.toggle('demo',e.target.checked);
+})();
 initialize();
 </script>
 </body>

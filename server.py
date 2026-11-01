@@ -397,13 +397,16 @@ def speak():
     if isinstance(pace, bool) or not isinstance(pace, (int, float)) or not math.isfinite(pace):
         raise Problem("bad_request", "Pace must be a finite number.")
     pace = max(0.5, min(1.5, float(pace)))
-    cache_key = hashlib.sha256(repr((g.token, text, lang, pace)).encode()).hexdigest()
+    qc = body.get("qc", False)
+    if not isinstance(qc, bool):
+        raise Problem("bad_request", "qc must be true or false.")
+    cache_key = hashlib.sha256(repr((g.token, text, lang, pace, qc)).encode()).hexdigest()
     if cache_key in g.session["cache"]:
         return jsonify(**g.session["cache"][cache_key], cached=True)
     synth_slot()
     charge(synth=True)
     response = sarvam_call(client.voice_cloning.convert, synth=True, voice_id=g.session["voice_id"],
-                          text=text, language_code=lang, pace=pace,
+                          text=text, language_code=lang, pace=pace, enable_qc=qc,
                           output_audio_codec="wav", speech_sample_rate=24000)
     result = dict(audio_b64=response.audio_b64, mime="audio/wav", duration=response.audio_duration,
                   romanized=romanize(text, lang))
