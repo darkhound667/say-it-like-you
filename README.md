@@ -89,3 +89,12 @@ Offline checks verify the error contract for free; `--live` enrolls a synthesize
 - **429 errors** — `rate_limited`: you hit the per-session/per-IP limit, wait `retry_after` seconds. `daily_cap`: the server's daily synthesis budget is used up.
 - **Voice sounds different** — record in a quiet room and speak naturally for 12–15 seconds. Some voice drift across languages is normal.
 - **Document too long** — each click reads at most five parts, and extraction is capped at 3000 characters. Use **Next 5 parts** to continue.
+
+## Hosting the page on Netlify
+
+Netlify serves only the static page (`frontend/`); the Flask backend (`server.py`, holds the Sarvam key) must run somewhere reachable over https (a Cloudflare tunnel, Render, Railway...).
+
+1. Edit `netlify.toml`: replace `BACKEND_URL` with the backend's public host (e.g. `my-tunnel.trycloudflare.com`). Netlify then forwards `/api/*` to it, so the page and API share one origin and no CORS setup is needed.
+2. In Netlify: *Add new site -> Import an existing project -> GitHub*, pick this repo. Publish directory `frontend` (already in `netlify.toml`), no build command.
+3. Set `PUBLIC_ORIGIN` on the backend to the Netlify site URL if you ever call the API cross-origin.
+4. If the backend URL changes (new tunnel), update `netlify.toml` and redeploy.
