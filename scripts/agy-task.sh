@@ -50,7 +50,7 @@ fi
 
 # Headless mode cannot prompt, so pre-allow only the commands needed to run and check code.
 # (Not --dangerously-skip-permissions. No git commit/push, no rm, no network tools.)
-ALLOW='{"permissions":{"allow":["command(python3 *)","command(python *)","command(node *)","command(npm test*)","command(npm run *)","command(npx *)","command(pytest*)","command(ls*)","command(cat *)","command(git status*)","command(git diff*)"]}}'
+ALLOW='{"permissions":{"allow":["command(python3)","command(python)","command(node)","command(npm test)","command(npm run)","command(npx)","command(pytest)","command(ls)","command(cat)","command(git status)","command(git diff)"]}}'
 
 cd "$WT"
 set +e
