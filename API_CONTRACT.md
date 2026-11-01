@@ -67,3 +67,14 @@ Normalize both sides (NFC, casefold, strip punctuation), split on whitespace, `d
 2. Consent + record (MediaRecorder, level meter, 10-15 s countdown) -> `POST /api/voice/enroll`.
 3. Pick language; type English (-> `/api/translate`) or native text -> `POST /api/speak` -> play `data:` URL from `audio_b64`.
 4. "Delete my voice" -> `DELETE /api/voice`.
+
+## Additions (post-launch)
+
+### POST `/api/speak` — optional `qc`
+Body may include `"qc": true|false` (default false, must be boolean else `bad_request`). When true the server passes `enable_qc=True` to Sarvam (slower, quality-checked). `qc` is part of the cache key.
+
+### POST `/api/extract`
+`multipart/form-data`: `file` (`.txt`, `.md`, `.markdown`, `.docx`; max 1 MB). Header `X-Session-Token`.
+200 `{"text":"...","chars":1234,"truncated":false,"name":"notes.docx"}` — plain text, whitespace-normalized, capped at 3000 chars (`truncated:true` if cut). No file is stored.
+Errors: `unsupported_file` 400, `payload_too_large` 413, `bad_request` 400 (unreadable or empty file).
+The frontend splits the text into <= 180-char chunks and reads at most 5 chunks per click via `/api/translate` (optional) + `/api/speak`, to respect the clone throttle.

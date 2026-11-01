@@ -6,6 +6,7 @@ from datetime import date, datetime, time as day_time, timedelta
 import difflib
 from functools import wraps
 import hashlib
+import io
 import math
 import os
 from pathlib import Path
@@ -16,9 +17,12 @@ import subprocess
 import sys
 import tempfile
 import threading
+import re
 import time
 import unicodedata
 import wave
+import xml.etree.ElementTree as ET
+import zipfile
 
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, request, send_from_directory
@@ -384,6 +388,68 @@ def translate():
         client.text.translate, input=text, source_language_code=source,
         target_language_code=target, model="sarvam-translate:v1").translated_text
     return jsonify(translated=translated, romanized=romanize(translated, target))
+
+
+EXTRACT_MAX_CHARS = 3000
+WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def strip_markdown(text):
+    text = re.sub(r"^\s*```.*$", "", text, flags=re.M)
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)
+    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"^\s{0,3}#{1,6}\s*", "", text, flags=re.M)
+    text = re.sub(r"^\s*>+\s?", "", text, flags=re.M)
+    text = re.sub(r"^\s*(?:[-*+]|\d+[.)])\s+", "", text, flags=re.M)
+    text = re.sub(r"(\*\*|__)(.+?)\1", r"\2", text)
+    text = re.sub(r"(?<![\w*])\*([^*\n]+)\*(?![\w*])", r"\1", text)
+    return re.sub(r"`([^`]*)`", r"\1", text)
+
+
+def docx_text(data):
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            with archive.open("word/document.xml") as member:
+                xml = member.read(5_000_001)
+        if len(xml) > 5_000_000:
+            raise ValueError("too large")
+        if b"<!DOCTYPE" in xml.upper() or b"<!ENTITY" in xml.upper():
+            raise ValueError("unsafe xml")
+        root = ET.fromstring(xml)
+    except (zipfile.BadZipFile, KeyError, ValueError, ET.ParseError, RuntimeError, OSError):
+        raise Problem("bad_request", "Could not read that Word file.")
+    paragraphs = ("".join(node.text or "" for node in para.iter(WORD_NS + "t"))
+                  for para in root.iter(WORD_NS + "p"))
+    return "\n".join(paragraphs)
+
+
+@app.post("/api/extract")
+@authenticated
+def extract():
+    upload = request.files.get("file")
+    filename = upload.filename if upload and upload.filename else ""
+    extension = os.path.splitext(filename)[1].lower()
+    if extension not in (".txt", ".md", ".markdown", ".docx"):
+        raise Problem("unsupported_file", "Upload a .txt, .md or .docx file.", 400)
+    data = upload.read(1_000_001)
+    if len(data) > 1_000_000:
+        raise Problem("payload_too_large", "That file is too large. Keep it under 1 MB.", 413)
+    if extension == ".docx":
+        text = docx_text(data)
+    else:
+        text = data.decode("utf-8", errors="replace")
+        if extension != ".txt":
+            text = strip_markdown(text)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    lines = (re.sub(r"[ \t\f\v\u00a0]+", " ", line).strip() for line in text.split("\n"))
+    text = "\n".join(line for line in lines if line).strip()
+    if not text:
+        raise Problem("bad_request", "No readable text found in that file.")
+    truncated = len(text) > EXTRACT_MAX_CHARS
+    if truncated:
+        text = text[:EXTRACT_MAX_CHARS].rstrip()
+    base = re.sub(r"[\x00-\x1f\x7f]", "", filename.replace("\\", "/").rsplit("/", 1)[-1]).strip()[:80]
+    return jsonify(text=text, chars=len(text), truncated=truncated, name=base)
 
 
 @app.post("/api/speak")
