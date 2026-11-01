@@ -171,6 +171,8 @@ def authenticated(handler):
         with state_lock:
             session = sessions.get(token)
         if session is None:
+            if token:
+                raise Problem("session_expired", "Your session expired. Start a new session.", 401)
             raise Problem("no_session", "Start a new session first.", 401)
         with session["lock"]:
             with state_lock:
