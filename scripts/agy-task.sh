@@ -48,9 +48,13 @@ if [ ! -d "$WT" ]; then
   git -C "$ROOT" worktree add -q -b "agy/$ID" "$WT"
 fi
 
+# Headless mode cannot prompt, so pre-allow only the commands needed to run and check code.
+# (Not --dangerously-skip-permissions. No git commit/push, no rm, no network tools.)
+ALLOW='{"permissions":{"allow":["command(python3 *)","command(python *)","command(node *)","command(npm test*)","command(npm run *)","command(npx *)","command(pytest*)","command(ls*)","command(cat *)","command(git status*)","command(git diff*)"]}}'
+
 cd "$WT"
 set +e
-"$AGY" --model "$MODEL" ${EXTRA[@]+"${EXTRA[@]}"} \
+"$AGY" --model "$MODEL" ${EXTRA[@]+"${EXTRA[@]}"} --settings "$ALLOW" \
   --mode accept-edits --sandbox --print-timeout "${AGY_TIMEOUT:-20m}" \
   -p "Read AGENTS.md and PLAN.md, then carry out the task in briefs/$ID.md. You are in a git worktree on branch agy/$ID. Do not run git commit; the manager commits. End with: files changed, how you verified, anything unfinished." \
   < /dev/null > "$ROOT/logs/$ID.log" 2>&1
