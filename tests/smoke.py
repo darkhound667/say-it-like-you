@@ -21,6 +21,7 @@ import tempfile
 import urllib.error
 import urllib.request
 import uuid
+import zipfile
 
 DEFAULT_BASE = "http://localhost:8000"
 TIMEOUT = 30
@@ -196,6 +197,66 @@ def offline_checks(runner, base):
                            json_body={"text": "hello", "target_lang": "hi-IN"})
         expect_envelope(st, body, 409, "no_voice")
 
+    def speak_bad_qc_no_voice():
+        token = new_session(base)
+        st, _, body = http(base, "POST", "/api/speak", token=token,
+                           json_body={"text": "hello", "target_lang": "hi-IN",
+                                      "qc": "yes"})
+        # The route checks voice availability before validating qc.
+        expect_envelope(st, body, 409, "no_voice")
+
+    def extract_txt():
+        payload, ctype = multipart(
+            files={"file": ("hello.txt", b"A small text file.", "text/plain")})
+        st, _, body = http(base, "POST", "/api/extract", token=state["token"],
+                           data=payload, content_type=ctype)
+        expect(st == 200, f"expected HTTP 200, got {st} (body={body[:160]!r})")
+        data = json_of(body)
+        expect(data.get("text") == "A small text file.", f"unexpected text: {data!r}")
+
+    def extract_markdown():
+        payload, ctype = multipart(
+            files={"file": ("notes.md", b"# Heading\n\n**bold text**", "text/markdown")})
+        st, _, body = http(base, "POST", "/api/extract", token=state["token"],
+                           data=payload, content_type=ctype)
+        expect(st == 200, f"expected HTTP 200, got {st} (body={body[:160]!r})")
+        result = json_of(body).get("text", "")
+        expect("#" not in result and "**" not in result,
+               f"markdown syntax remains in output: {result!r}")
+
+    def extract_docx():
+        xml = (b'<?xml version="1.0" encoding="UTF-8"?>'
+               b'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+               b'<w:body><w:p><w:r><w:t>First paragraph.</w:t></w:r></w:p>'
+               b'<w:p><w:r><w:t>Second paragraph.</w:t></w:r></w:p></w:body></w:document>')
+        buf = tempfile.SpooledTemporaryFile()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("word/document.xml", xml)
+        buf.seek(0)
+        payload, ctype = multipart(
+            files={"file": ("two-paragraphs.docx", buf.read(),
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})
+        st, _, body = http(base, "POST", "/api/extract", token=state["token"],
+                           data=payload, content_type=ctype)
+        expect(st == 200, f"expected HTTP 200, got {st} (body={body[:160]!r})")
+        result = json_of(body).get("text", "")
+        expect("First paragraph." in result and "Second paragraph." in result,
+               f"both paragraphs not present: {result!r}")
+
+    def extract_unsupported():
+        payload, ctype = multipart(
+            files={"file": ("report.pdf", b"not really a PDF", "application/pdf")})
+        st, _, body = http(base, "POST", "/api/extract", token=state["token"],
+                           data=payload, content_type=ctype)
+        expect_envelope(st, body, 400, "unsupported_file")
+
+    def extract_no_token():
+        payload, ctype = multipart(
+            files={"file": ("hello.txt", b"hello", "text/plain")})
+        st, _, body = http(base, "POST", "/api/extract", data=payload,
+                           content_type=ctype)
+        expect_envelope(st, body, 401, "no_session")
+
     def translate_too_long():
         expect(state.get("token"), "no session token — earlier session check failed")
         st, _, body = http(base, "POST", "/api/translate", token=state["token"],
@@ -243,6 +304,13 @@ def offline_checks(runner, base):
     runner.check("POST /api/speak with bad token -> 401 session_expired", speak_bad_token)
     runner.check("enroll without consent -> 400 consent_required", enroll_no_consent)
     runner.check("POST /api/speak with token but no voice -> 409 no_voice", speak_no_voice)
+    runner.check("POST /api/speak qc invalid type with no voice -> 409 no_voice",
+                 speak_bad_qc_no_voice)
+    runner.check("POST /api/extract tiny .txt -> 200 text", extract_txt)
+    runner.check("POST /api/extract .md strips markdown markers", extract_markdown)
+    runner.check("POST /api/extract .docx includes both paragraphs", extract_docx)
+    runner.check("POST /api/extract .pdf -> 400 unsupported_file", extract_unsupported)
+    runner.check("POST /api/extract with no token -> 401 no_session", extract_no_token)
     runner.check("POST /api/translate text >200 chars -> 400 text_too_long", translate_too_long)
     runner.check("unsupported language -> 400 unsupported_language", unsupported_language)
     runner.check("GET /api/voice -> voice_ready false", voice_not_ready)
